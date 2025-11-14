@@ -1,7 +1,7 @@
 #include "dependencies/glad/include/glad/glad.h"
 #include "dependencies/glad/glad.c"
 
-#include <GLFW/glfw3.h>
+#include "dependencies/glfw/glfw3.h"
  
 #include <iostream> 
  
