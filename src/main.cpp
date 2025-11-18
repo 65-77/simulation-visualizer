@@ -6,6 +6,56 @@
 #include <math.h>
 #include <iostream>
 
+static unsigned int compileShader(unsigned int type, const std::string& source) {
+   unsigned int id = glCreateShader(type);			// https://docs.gl/gl4/glCreateShader
+
+   const char* src = source.c_str();
+
+   glShaderSource(id, 1, &src, nullptr);			// https://docs.gl/gl4/glShaderSource
+   glCompileShader(id);						// https://docs.gl/gl4/glCompileShader	
+   
+   int shaderResult;
+
+   glGetShaderiv(id, GL_COMPILE_STATUS, &shaderResult);		// https://docs.gl/gl4/glGetShader	
+   
+   if(shaderResult == GL_FALSE){
+      int logLength;
+      glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);		// https://docs.gl/gl4/glGetShader
+
+      char* errorMessage = (char*)alloca(logLength*sizeof(char));	// https://www.geeksforgeeks.org/c/pointer-arithmetics-in-c-with-examples/
+									// https://www.man7.org/linux/man-pages/man3/alloca.3.html
+      glGetShaderInfoLog(id, logLength, &logLength, errorMessage);	// https://docs.gl/gl4/glGetShaderInfoLog
+      
+      std::cout << "CompileShader:\n\tshaderResult " <<
+	 (type == GL_VERTEX_SHADER ? "vertex: " : "fragment ")		// checks shader type
+	 <<"= GL_FALSE" << std::endl;
+      std::cout << errorMessage << std::endl;
+
+      glDeleteShader(id);					// https://docs.gl/gl4/glDeleteShader
+
+      return 0;
+   }
+
+   return id;
+}
+
+static unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader) { // Taking in source code of shaders as strings
+   unsigned int program = glCreateProgram();	// https://docs.gl/gl4/glCreateProgram
+   
+   unsigned int vtxShader = compileShader(GL_VERTEX_SHADER, vertexShader);
+   unsigned int frgShader = compileShader(GL_FRAGMENT_SHADER, fragmentShader);
+
+   glAttachShader(program, vtxShader);		// https://docs.gl/gl4/glAttachShader	
+   glAttachShader(program, frgShader);
+
+   glLinkProgram(program);			// https://docs.gl/gl4/glLinkProgram
+   glValidateProgram(program);			// https://docs.gl/gl4/glValidateProgram 
+   
+   glDeleteShader(vtxShader);			// https://docs.gl/gl4/glDeleteShader
+   glDeleteShader(frgShader);
+   return program; 
+}
+
 /* Makes triangle produced into a equailateral by giving appropriate height */
 float window_geometry(int hyp, int x) {
 
@@ -35,8 +85,8 @@ int main(void) {
    glfwMakeContextCurrent(window); // Selects window that's going to be edited(?)
 
    /* Initialze glew */
-   if (!glewInit() != GLEW_OK) { // If glew failed to initialize, notify
-      std::cout << "Failed to initialize GLEW";
+   if (glewInit() != GLEW_OK) { // If glew failed to initialize, notify
+      std::cout << "Failed to initialize GLEW" << std::endl;
    }
    
    float triangle_coordinates[6] = { // coordinates of each vertex of the triangle. -1.0f, -1.0f is bottom-left, 1.0f, 1.0f is top-right
@@ -48,10 +98,29 @@ int main(void) {
    unsigned int triangle_buffer;											// unsigned int needed
    glGenBuffers(1,&triangle_buffer); 			// Generates 'n' amount of buffers assigned to an uint		// https://docs.gl/gl4/glGenBuffers
    glBindBuffer(GL_ARRAY_BUFFER, triangle_buffer);	// Bound buffer is the one future commands will edit!!		// https://docs.gl/gl4/glBindBuffer
-   glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_coordinates) * sizeof(float), triangle_coordinates, GL_STATIC_DRAW);	// https://docs.gl/gl4/glBufferData
+   glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_coordinates), triangle_coordinates, GL_STATIC_DRAW);	// https://docs.gl/gl4/glBufferData
    
    glEnableVertexAttribArray(0);					// https://docs.gl/gl4/glVertexAttribPointer
-   glVertexAttribPointer(0,2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0);  // https://docs.gl/gl4/glEnableVertexAttribArray
+   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0);  // https://docs.gl/gl4/glEnableVertexAttribArray
+   
+   std::string vertexShader =
+      "#version 330 core\n"
+      "\n"
+      "layout(location = 0) in vec4 triangle_coordinates;\n"
+      "\n"
+      "void main() {\n"
+      "   gl_Position = triangle_coordinates;\n"
+      "}\n";
+   std::string fragmentShader =
+       "#version 330 core\n"
+      "\n"
+      "layout(location = 0) out vec4 triangle_color;\n"
+      "\n"
+      "void main() {\n"
+      "   triangle_color = vec4(0.0, 1.0, 0.0, 1.0);\n"
+      "}\n";
+   unsigned int shader = createShader(vertexShader, fragmentShader);
+   glUseProgram(shader);
 
    /* Loop until the user closes the window */
    while (!glfwWindowShouldClose(window))
@@ -60,7 +129,7 @@ int main(void) {
       glClear(GL_COLOR_BUFFER_BIT);	// https://docs.gl/gl4/glClear
 				        // Refreshes back-buffer, allowing us to display info before displaying it
       glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle_coordinates)/2);	// https://docs.gl/gl4/glDrawArrayw
-									// divided by 2 due to each vertex having 2 dimensional coordinates
+									// divided by 2 due to each vertex having 2 dimensional coordinates per item
 
       /* Swap front and back buffers */
       glfwSwapBuffers(window); // swaps the back and front buffer, allowing us to view displayed info in the previous back-buffer
@@ -68,6 +137,9 @@ int main(void) {
       /* Poll for and process events */
       glfwPollEvents(); // Detects events, and is most likely just an even handler (?)
    }
+   
+   glDeleteProgram(shader);	// https://docs.gl/gl4/glDeleteProgram
+
    glfwTerminate(); // Terminates glfw process
    return 0;
 }
