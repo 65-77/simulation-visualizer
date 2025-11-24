@@ -3,8 +3,46 @@
 #include "../dependencies/GLEW/glew.h"
 #include "../dependencies/GLFW/include/GLFW/glfw3.h"
 
-#include <math.h>
-#include <iostream>
+#include <math.h> // math
+#include <iostream> // input/output stream
+#include <fstream> // file stream
+#include <string> // strings!
+#include <sstream> //string stream
+
+struct ShaderProgramSource {
+   std::string VertexSource;
+   std::string FragmentSource;
+};
+
+/* Seperates vertex and fragment shader when reading shader file ( primary.shader ) */
+static ShaderProgramSource ParseShader(const std::string& shaderFilePath) {
+   std::ifstream stream(shaderFilePath); // takes in input file
+   if (!stream.is_open()) {
+      std::cout << "Shader file not open " << shaderFilePath << std::endl;
+   }
+   
+   enum class ShaderType {
+      NONE = -1, VERTEX = 0, FRAGMENT = 1
+   };
+   
+   std::stringstream ss[2]; // one for vertex, one for fragments
+   std::string currentLine;
+   ShaderType type = ShaderType::NONE;
+
+   while(getline(stream, currentLine)) { // Loops through content until it condition met
+      if (currentLine.find("#shader") != std::string::npos) {
+	 if (currentLine.find("vertex") != std::string::npos) { // checks for vertex, to specify vertex
+	    type = ShaderType::VERTEX;
+	 } else if (currentLine.find("fragment") != std::string::npos) { // checks for fragment to specify fragment
+	    type = ShaderType::FRAGMENT;
+	 }
+      } else {
+	 ss[(int)type] << currentLine << '\n'; 
+      }
+   }
+
+   return { ss[0].str(), ss[1].str() };
+}
 
 static unsigned int compileShader(unsigned int type, const std::string& source) {
    unsigned int id = glCreateShader(type);			// https://docs.gl/gl4/glCreateShader
@@ -18,7 +56,7 @@ static unsigned int compileShader(unsigned int type, const std::string& source) 
 
    glGetShaderiv(id, GL_COMPILE_STATUS, &shaderResult);		// https://docs.gl/gl4/glGetShader	
    
-   if(shaderResult == GL_FALSE){
+   if (shaderResult == GL_FALSE){
       int logLength;
       glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);		// https://docs.gl/gl4/glGetShader
 
@@ -75,7 +113,7 @@ int main(void) {
    }
 
    /* Create a windowed mode window and its OpenGL context */
-   window = glfwCreateWindow(640, window_geometry(640, 640/2), "Hello World", NULL, NULL); // window function(x, y, name, NULL, NULL)
+   window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL); // window function(x, y, name, NULL, NULL)
  
    if (!window) { // If the window failed to initialize, terminates the glfw proccess
       glfwTerminate();
@@ -89,10 +127,14 @@ int main(void) {
       std::cout << "Failed to initialize GLEW" << std::endl;
    }
    
-   float triangle_coordinates[6] = { // coordinates of each vertex of the triangle. -1.0f, -1.0f is bottom-left, 1.0f, 1.0f is top-right
-      -1.0f, -1.0f,	// vertex 1: x: -1.0f, y: -1.0f
-       0.0f,  1.0f,	// vertex 2: x:  1.0f, y:  1.0f
-       1.0f, -1.0f	// vertex 3: x:  1.0f, y: -1.0f
+   float triangle_coordinates[] = { // coordinates of each vertex of the triangle. -1.0f, -1.0f is bottom-left, 1.0f, 1.0f is top-right
+      -0.5f, -0.5f,	// vertex 1: x: -0.5f, y: -0.5f
+       0.0f,  0.5f,	// vertex 2: x:  0.0f, y:  0.5f
+       0.5f, -0.5f,	// vertex 3: x:  0.5f, y: -0.5f
+
+      -1.0f,  0.5f,
+       0.0f,  0.5f,
+      -0.5f, -0.5f
    };
    
    unsigned int triangle_buffer;											// unsigned int needed
@@ -101,25 +143,11 @@ int main(void) {
    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_coordinates), triangle_coordinates, GL_STATIC_DRAW);	// https://docs.gl/gl4/glBufferData
    
    glEnableVertexAttribArray(0);					// https://docs.gl/gl4/glVertexAttribPointer
-   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0);  // https://docs.gl/gl4/glEnableVertexAttribArray
+   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);  // https://docs.gl/gl4/glEnableVertexAttribArray
    
-   std::string vertexShader =
-      "#version 330 core\n"
-      "\n"
-      "layout(location = 0) in vec4 triangle_coordinates;\n"
-      "\n"
-      "void main() {\n"
-      "   gl_Position = triangle_coordinates;\n"
-      "}\n";
-   std::string fragmentShader =
-       "#version 330 core\n"
-      "\n"
-      "layout(location = 0) out vec4 triangle_color;\n"
-      "\n"
-      "void main() {\n"
-      "   triangle_color = vec4(0.0, 1.0, 0.0, 1.0);\n"
-      "}\n";
-   unsigned int shader = createShader(vertexShader, fragmentShader);
+   ShaderProgramSource source = ParseShader("../res/shaders/primary.shader");
+   
+   unsigned int shader = createShader(source.VertexSource, source.FragmentSource);
    glUseProgram(shader);
 
    /* Loop until the user closes the window */
