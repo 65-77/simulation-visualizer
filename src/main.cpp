@@ -94,15 +94,6 @@ static unsigned int createShader(const std::string& vertexShader, const std::str
    return program; 
 }
 
-/* Makes triangle produced into a equailateral by giving appropriate height */
-float window_geometry(int hyp, int x) {
-
-   float height = (sqrt((hyp*hyp)-(x*x)));	// pythagoreas: sqrt((hyp^2)-adjacent^2) = opposite 
-   int round_height = round(height); 		// rounding for easier window computation (?)
-   
-   return round_height;
-}
-
 int main(void) {
    GLFWwindow* window; // Defines the window varaible to a "GLFWwindow*" "datatype" (?)
 
@@ -128,22 +119,30 @@ int main(void) {
    }
    
    float triangle_coordinates[] = { // coordinates of each vertex of the triangle. -1.0f, -1.0f is bottom-left, 1.0f, 1.0f is top-right
-      -0.5f, -0.5f,	// vertex 1: x: -0.5f, y: -0.5f
-       0.0f,  0.5f,	// vertex 2: x:  0.0f, y:  0.5f
-       0.5f, -0.5f,	// vertex 3: x:  0.5f, y: -0.5f
-
-      -1.0f,  0.5f,
-       0.0f,  0.5f,
-      -0.5f, -0.5f
+      -0.5f, -0.5f,	// vertex 0: x: -0.5f, y: -0.5f
+       0.5f,  0.5f,	// vertex 1: x:  0.0f, y:  0.5f
+       0.5f, -0.5f,	// vertex 2: x:  0.5f, y: -0.5f
+      -0.5f,  0.5f,	// vertex 3: x: -0.5f, y:  0.5f
    };
    
-   unsigned int triangle_buffer;											// unsigned int needed
-   glGenBuffers(1,&triangle_buffer); 			// Generates 'n' amount of buffers assigned to an uint		// https://docs.gl/gl4/glGenBuffers
-   glBindBuffer(GL_ARRAY_BUFFER, triangle_buffer);	// Bound buffer is the one future commands will edit!!		// https://docs.gl/gl4/glBindBuffer
-   glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_coordinates), triangle_coordinates, GL_STATIC_DRAW);	// https://docs.gl/gl4/glBufferData
+   /* Index buffer */
+   unsigned int triangle_indices[] = { // Allows us to reuse coordinates from memory
+      0, 1, 2,		// triangle: 1: vertex: 0, 1 and 2
+      0, 1, 3		// traingle: 2: vertex: 2, 3 and 0
+   };
+
+   unsigned int triangle_buffer;										// unsigned int needed
+   glGenBuffers(1,&triangle_buffer); 			// Generates 'n' amount of buffers assigned to an uint	// https://docs.gl/gl4/glGenBuffers
+   glBindBuffer(GL_ARRAY_BUFFER, triangle_buffer);	// Bound buffer is the one future commands will edit!!	// https://docs.gl/gl4/glBindBuffer
+   glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), triangle_coordinates, GL_STATIC_DRAW); // data to gpu?	// https://docs.gl/gl4/glBufferData
    
    glEnableVertexAttribArray(0);					// https://docs.gl/gl4/glVertexAttribPointer
    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);  // https://docs.gl/gl4/glEnableVertexAttribArray
+
+   unsigned int ibo;				// Index buffer object
+   glGenBuffers(1, &ibo);			// Generates a new buffer
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo); 	// Binds it to an Element array buffer
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), triangle_indices, GL_STATIC_DRAW);
    
    ShaderProgramSource source = ParseShader("../res/shaders/primary.shader");
    
@@ -156,8 +155,10 @@ int main(void) {
       /* Render here */
       glClear(GL_COLOR_BUFFER_BIT);	// https://docs.gl/gl4/glClear
 				        // Refreshes back-buffer, allowing us to display info before displaying it
-      glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle_coordinates)/2);	// https://docs.gl/gl4/glDrawArrayw
+      // glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle_coordinates)/2);	// https://docs.gl/gl4/glDrawArrayw
 									// divided by 2 due to each vertex having 2 dimensional coordinates per item
+
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);	// https://docs.gl/gl4/glDrawElements
 
       /* Swap front and back buffers */
       glfwSwapBuffers(window); // swaps the back and front buffer, allowing us to view displayed info in the previous back-buffer
