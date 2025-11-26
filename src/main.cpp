@@ -145,11 +145,11 @@ float colorIncrementor(float color, float &increment) {
    /* rounds value if higher than max */
    if (color >= 1.0f) {
       color = 1.0f;
-      increment = -increment;
-   /* rounds value if lower than max */
+      increment = -increment;	// reverses increment
+      /* rounds value if lower than max */
    } else if (color <=0.0f) {
       color = 0.0f;
-      increment = -increment;
+      increment = -increment;	// reverses increment
    }
 
    return color;
@@ -164,8 +164,12 @@ int main(void) {
       return -1;
    }
 
+   float monitor_x, monitor_y;
+   monitor_x = 1980.0;
+   monitor_y = 1120.0;
+
    /* Create a windowed mode window and its OpenGL context */
-   GLCall(window = glfwCreateWindow(1980, 1120, "Hello World", NULL, NULL)); // window function(x, y, name, NULL, NULL
+   GLCall(window = glfwCreateWindow((int) monitor_x, (int) monitor_y, "Hello World", NULL, NULL)); // window function(x, y, name, NULL, NULL
 
    if (!window) { // If the window failed to initialize, terminates the glfw proccess
       GLCall(glfwTerminate());
@@ -174,28 +178,30 @@ int main(void) {
    /* Make the window's context current */
    GLCall(glfwMakeContextCurrent(window)); // Selects window that's going to be edited(?)
 
+   GLCall(glfwSwapInterval(1));	// syncs refresh-rate to that of the monitor
+
    /* Initialze glew */
    if (glewInit() != GLEW_OK) { // If glew failed to initialize, notify
       std::cout << "Failed to initialize GLEW" << std::endl;
    }
 
    float triangle_coordinates[] = { // coordinates of each vertex of the triangle. -1.0f, -1.0f is bottom-left, 1.0f, 1.0f is top-right
-      -1.0f, -1.0f,	// vertex 0: x: -0.5f, y: -0.5f
-      1.0f,  1.0f,	// vertex 1: x:  0.0f, y:  0.5f
-      1.0f, -1.0f,	// vertex 2: x:  0.5f, y: -0.5f
-      -1.0f,  1.0f,	// vertex 3: x: -0.5f, y:  0.5f
+      -1.0f, 		 1.0f,			// vertex 0: x: -0.5f, y: -0.5f
+      -0.998989898f,  	 1.0f,			// vertex 1: x:  0.5f, y:  0.5f
+      -0.998989898f,	-1.0f, //0.998214286f,	// vertex 2: x:  0.5f, y: -0.5f
+      -1.0f,		-1.0f, //0.998214286f,	// vertex 3: x: -0.5f, y:  0.5f
    };
 
    /* Index buffer */
    unsigned int triangle_indices[] = { // Allows us to reuse coordinates from memory
-      0, 1, 2,		// triangle: 1: vertex: 0, 1 and 2
-      0, 1, 3		// traingle: 2: vertex: 2, 3 and 0
+      0, 1, 3,		// triangle: 1: vertex: 0, 1 and 2
+      3, 1, 2,		// traingle: 2: vertex: 2, 3 and 0
    };
 
    unsigned int triangle_buffer;				// unsigned int needed
    GLCall(glGenBuffers(1,&triangle_buffer)); 			// Generates 'n' amount of buffers assigned to an uint	// https://docs.gl/gl4/glGenBuffers
    GLCall(glBindBuffer(GL_ARRAY_BUFFER, triangle_buffer));	// Bound buffer is the one future commands will edit!!	// https://docs.gl/gl4/glBindBuffer
-   GLCall(glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), triangle_coordinates, GL_STATIC_DRAW)); // data to gpu?	// https://docs.gl/gl4/glBufferData
+   GLCall(glBufferData(GL_ARRAY_BUFFER, 4 * 2 * sizeof(float), triangle_coordinates, GL_STATIC_DRAW)); // data to gpu?	// https://docs.gl/gl4/glBufferData
 
    GLCall(glEnableVertexAttribArray(0));					// https://docs.gl/gl4/glVertexAttribPointer
    GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0));  // https://docs.gl/gl4/glEnableVertexAttribArray
@@ -210,19 +216,27 @@ int main(void) {
    unsigned int shader = createShader(source.VertexSource, source.FragmentSource);
    GLCall(glUseProgram(shader));
 
+   GLCall(glUseProgram(0));
+   GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+   GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
    GLCall(int location = glGetUniformLocation(shader, "u_Color"));
    ASSERT(location != -1);
-   // GLCall(glUniform4f(location, 0.2f, 0.3f, 0.8f, 1.0f));
 
    /* RGB */
    float r, g, b, a;
-   r = 0.0f;
+   r = 1.0f;
    g = 0.0f;
-   b = 1.0f;
+   b = 0.0f;
    a = 1.0f;
 
    /* Increment */
-   float basei = 0.1f;  
+   float basei = 1.0/255;
+
+   /* pixel sizes */
+   float pix_x, pix_y;
+   pix_x = 1.0/monitor_x;
+   pix_y = 1.0/monitor_y;
 
    ///------------///   
    ///- MAINLOOP -///
@@ -233,17 +247,43 @@ int main(void) {
       /* Render here */
       GLCall(glClear(GL_COLOR_BUFFER_BIT));	// https://docs.gl/gl4/glClear
 
-      // Refreshes back-buffer, allowing us to display info before displaying it
-      // glDrawArrays(GL_TRIANGLES, 0, sizeof(triangle_coordinates)/2);	// https://docs.gl/gl4/glDrawArrayw
-      // divided by 2 due to each vertex having 2 dimensional coordinates per item
-      r = colorIncrementor(r, basei);
-      g = colorIncrementor(g, basei);
-      b = colorIncrementor(b, basei);
-
+      GLCall(glUseProgram(shader));
       GLCall(glUniform4f(location, r, g, b, a));
 
-      GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));	// https://docs.gl/gl4/glDrawElements
+      GLCall(glBindBuffer(GL_ARRAY_BUFFER, triangle_buffer));
+      
+      GLCall(glEnableVertexAttribArray(0));					
+      GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0));
 
+      GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+
+      b = colorIncrementor(b, basei);
+      g = colorIncrementor(g, basei);
+      r = colorIncrementor(r, basei);
+
+      GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));	// https://docs.gl/gl4/glDrawElements
+      
+      triangle_coordinates[2] += pix_x;
+      triangle_coordinates[4] += pix_x;
+
+      if (triangle_coordinates[2] >= 1.0f) {
+	 triangle_coordinates[2] = 1.0f;
+      }
+      if (triangle_coordinates[4] >= 1.0f) {
+	 triangle_coordinates[4] = 1.0f;
+      }
+      
+//      triangle_coordinates[5] += -pix_y;
+//      triangle_coordinates[7] += -pix_y;
+//      
+//      if (triangle_coordinates[5] <= -1.0f) {
+//	 triangle_coordinates[5] = -1.0f;
+//      }
+//      if (triangle_coordinates[7] <= -1.0f) {
+//	 triangle_coordinates[7] = -1.0f;
+//      }
+
+      GLCall(glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(triangle_coordinates), triangle_coordinates));
 
 
       /* Swap front and back buffers */
